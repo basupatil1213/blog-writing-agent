@@ -23,6 +23,7 @@ node_modules/
 *.lock
 
 # Generated / output artifacts
+graph_structure.png
 images/
 
 # Generated blog post outputs (markdown files at repo root that are not README)
