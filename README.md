@@ -23,51 +23,9 @@ Built with **LangGraph**, **LangChain**, **OpenAI GPT-4o**, **Tavily web search*
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Browser (React SPA)                       │
-│                                                                   │
-│  LandingPage → LoginPage / RegisterPage                          │
-│  GeneratorPage (BlogForm → SSE stream → BlogSkeleton/BlogDisplay)│
-│  SavedBlogsPage → SavedBlogDetailPage                            │
-│  AuthContext (JWT session restore on refresh)                    │
-└───────────────────┬─────────────────────────┬────────────────────┘
-                    │ SSE  POST /api/v1/blog/  │ REST /api/v1/auth/*
-                    │      generate            │      /api/v1/blogs/*
-┌───────────────────▼─────────────────────────▼────────────────────┐
-│                         FastAPI Backend                            │
-│                                                                   │
-│  ┌─────────────────────────────────────────────────────────────┐  │
-│  │                     LangGraph Pipeline                      │  │
-│  │                                                             │  │
-│  │  START → router ──(needs research?)──▶ research             │  │
-│  │            │                               │                │  │
-│  │            └───────────────────────────────┘                │  │
-│  │                          ▼                                  │  │
-│  │                    orchestrator (plan)                       │  │
-│  │                          │                                  │  │
-│  │              ┌───────────┴──────────┐                       │  │
-│  │              │  fan-out (Send API)  │                       │  │
-│  │              ▼          ▼          ▼                        │  │
-│  │           worker     worker     worker  …                   │  │
-│  │              └──────────┴──────────┘                        │  │
-│  │                          ▼                                  │  │
-│  │               merge → decide_images                         │  │
-│  │                    → generate_and_place_images               │  │
-│  │                          ▼ END                              │  │
-│  └─────────────────────────────────────────────────────────────┘  │
-│                                                                   │
-│  Auth service (bcrypt + JWT HS256 + refresh token rotation)       │
-│  Blog service (CRUD via SQLAlchemy 2.0 async ORM)                 │
-│  Storage service (MinIO / local filesystem abstraction)           │
-└──────────┬────────────────────────────────────────┬──────────────┘
-           │                                        │
-┌──────────▼──────────┐                  ┌──────────▼──────────┐
-│  PostgreSQL 16       │                  │  MinIO (S3-compat.)  │
-│  Users, SavedBlogs   │                  │  AI-generated images │
-│  RefreshTokens       │                  │  blog-images bucket  │
-└─────────────────────┘                  └─────────────────────┘
-```
+![System Architecture](docs/architecture.png)
+
+Three-layer design: the React SPA communicates with the FastAPI backend over SSE (blog generation) and REST+cookies (auth/saved blogs); the backend persists data to PostgreSQL and images to MinIO via a swappable `StorageBackend` abstraction.
 
 ### LangGraph pipeline stages
 
