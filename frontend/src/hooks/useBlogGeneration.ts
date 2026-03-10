@@ -12,6 +12,7 @@ interface UseBlogGenerationReturn {
   result: BlogResult | null;
   error: string | null;
   elapsedMs: number;
+  topic: string;
   generate: (topic: string) => Promise<void>;
   reset: () => void;
 }
@@ -22,6 +23,7 @@ export function useBlogGeneration(): UseBlogGenerationReturn {
   const [result, setResult] = useState<BlogResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [elapsedMs, setElapsedMs] = useState(0);
+  const [topic, setTopic] = useState('');
 
   const abortRef = useRef<AbortController | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -53,7 +55,8 @@ export function useBlogGeneration(): UseBlogGenerationReturn {
   }, [stopTimer]);
 
   const generate = useCallback(
-    async (topic: string) => {
+    async (incomingTopic: string) => {
+      setTopic(incomingTopic);
       // Cancel any in-flight request
       abortRef.current?.abort();
       const controller = new AbortController();
@@ -68,7 +71,7 @@ export function useBlogGeneration(): UseBlogGenerationReturn {
 
       try {
         const stream = streamBlogGeneration(
-          { topic },
+          { topic: incomingTopic },
           controller.signal,
         );
 
@@ -119,5 +122,5 @@ export function useBlogGeneration(): UseBlogGenerationReturn {
     [startTimer, stopTimer],
   );
 
-  return { status, steps, result, error, elapsedMs, generate, reset };
+  return { status, steps, result, error, elapsedMs, topic, generate, reset };
 }

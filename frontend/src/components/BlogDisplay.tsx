@@ -1,17 +1,24 @@
 import {
+  Bookmark,
+  BookmarkCheck,
   BookOpen,
   CheckCircle2,
   Clock,
   Copy,
   Database,
   Download,
+  ExternalLink,
   Layers,
+  Loader2,
 } from 'lucide-react';
 import { useCallback, useState } from 'react';
+import { Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import remarkGfm from 'remark-gfm';
 import { StatusBadge } from './StatusBadge';
+import { useAuth } from '@/context/AuthContext';
+import { savedBlogsApi } from '@/api/savedBlogsApi';
 import type { BlogResult } from '@/types';
 
 // Import highlight.js theme via inline style injection (avoids extra build steps)
@@ -21,10 +28,42 @@ const HIGHLIGHT_THEME_URL =
 interface BlogDisplayProps {
   result: BlogResult;
   elapsedMs: number;
+  topic: string;
 }
 
-export function BlogDisplay({ result, elapsedMs }: BlogDisplayProps) {
+type SaveState = 'idle' | 'saving' | 'saved' | 'error';
+
+export function BlogDisplay({ result, elapsedMs, topic }: BlogDisplayProps) {
+  const { user } = useAuth();
   const [copied, setCopied] = useState(false);
+  const [saveState, setSaveState] = useState<SaveState>('idle');
+  const [savedBlogId, setSavedBlogId] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const handleSave = useCallback(async () => {
+    if (saveState === 'saving' || saveState === 'saved') return;
+    setSaveState('saving');
+    setSaveError(null);
+    try {
+      const saved = await savedBlogsApi.save({
+        title: result.title,
+        topic,
+        blog_kind: result.blog_kind,
+        mode: result.mode,
+        needs_research: result.needs_research,
+        evidence_count: result.evidence_count,
+        section_count: result.section_count,
+        content: result.content,
+        image_urls: [],
+        generation_time_ms: elapsedMs,
+      });
+      setSavedBlogId(saved.id);
+      setSaveState('saved');
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to save');
+      setSaveState('error');
+    }
+  }, [result, elapsedMs, topic, saveState]);
 
   const handleCopy = useCallback(async () => {
     await navigator.clipboard.writeText(result.content);
@@ -79,11 +118,41 @@ export function BlogDisplay({ result, elapsedMs }: BlogDisplayProps) {
             </button>
             <button
               onClick={handleDownload}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
             >
               <Download className="w-3.5 h-3.5" />
               Download
             </button>
+            {user && (
+              saveState === 'saved' ? (
+                <Link
+                  to={`/app/saved/${savedBlogId}`}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors ring-1 ring-inset ring-emerald-200"
+                >
+                  <BookmarkCheck className="w-3.5 h-3.5" />
+                  Saved
+                  <ExternalLink className="w-3 h-3 opacity-60" />
+                </Link>
+              ) : (
+                <button
+                  onClick={handleSave}
+                  disabled={saveState === 'saving'}
+                  title={saveState === 'error' ? saveError ?? 'Save failed' : 'Save to My Blogs'}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                    saveState === 'error'
+                      ? 'text-red-600 bg-red-50 hover:bg-red-100 ring-1 ring-inset ring-red-200'
+                      : 'text-white bg-brand-600 hover:bg-brand-700 disabled:opacity-60'
+                  }`}
+                >
+                  {saveState === 'saving' ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Bookmark className="w-3.5 h-3.5" />
+                  )}
+                  {saveState === 'saving' ? 'Saving…' : saveState === 'error' ? 'Retry save' : 'Save'}
+                </button>
+              )
+            )}
           </div>
         </div>
 
