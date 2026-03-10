@@ -7,7 +7,7 @@ requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.30.0",
-    "pydantic>=2.7.0",
+    "pydantic[email]>=2.7.0",
     "pydantic-settings>=2.3.0",
     "python-dotenv>=1.0.1",
     # LangChain / LangGraph
@@ -20,6 +20,16 @@ dependencies = [
     "tavily-python>=0.5.0",
     # Image generation (optional – only needed if GOOGLE_API_KEY is set)
     "google-genai>=0.8.0",
+    # ── Database ─────────────────────────────────────────────────────────────
+    "sqlalchemy[asyncio]>=2.0.0",
+    "asyncpg>=0.30.0",
+    "alembic>=1.13.0",
+    # ── Auth ─────────────────────────────────────────────────────────────────
+    "passlib[bcrypt]>=1.7.4",
+    "python-jose[cryptography]>=3.3.0",
+    "python-multipart>=0.0.12",
+    # ── Object storage ───────────────────────────────────────────────────────
+    "boto3>=1.35.0",
 ]
 
 [project.optional-dependencies]

@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 from datetime import date, timedelta
-from pathlib import Path
 from typing import Callable, List, Optional
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -291,8 +290,13 @@ def decide_images(state: State) -> dict:
 
 
 def generate_and_place_images(state: State) -> dict:
-    """Generate images via Gemini and embed them into the Markdown."""
+    """Generate images via Gemini and embed them into the Markdown.
+
+    Images are uploaded via the configured storage backend (MinIO or local
+    filesystem). The public URL returned by the backend is embedded in markdown.
+    """
     from app.services.image_gen import GeminiImageService  # lazy import
+    from app.services.storage import get_storage  # lazy import
 
     plan = state["plan"]
     assert plan is not None
@@ -303,31 +307,37 @@ def generate_and_place_images(state: State) -> dict:
     if not image_specs:
         return {"final": md}
 
-    images_dir = Path(settings.images_dir)
-    images_dir.mkdir(parents=True, exist_ok=True)
-
+    storage = get_storage()
     image_svc = GeminiImageService()
 
     for spec in image_specs:
         placeholder: str = spec["placeholder"]
         filename: str = spec["filename"]
-        out_path = images_dir / filename
 
-        if not out_path.exists():
-            try:
+        try:
+            if not storage.exists(filename):
                 img_bytes = image_svc.generate(spec["prompt"])
-                out_path.write_bytes(img_bytes)
-            except Exception as exc:
-                prompt_block = (
-                    f"> **[IMAGE GENERATION FAILED]** {spec.get('caption', '')}\n>\n"
-                    f"> **Alt:** {spec.get('alt', '')}\n>\n"
-                    f"> **Prompt:** {spec.get('prompt', '')}\n>\n"
-                    f"> **Error:** {exc}\n"
-                )
-                md = md.replace(placeholder, prompt_block)
-                continue
+                public_url = storage.upload(filename, img_bytes)
+            else:
+                # Derive URL without re-uploading
+                from app.services.storage import LocalStorageBackend, MinIOStorageBackend
+                if isinstance(storage, MinIOStorageBackend):
+                    scheme = "https" if settings.minio_secure else "http"
+                    base = settings.minio_public_url or f"{scheme}://{settings.minio_endpoint}"
+                    public_url = f"{base}/{settings.minio_bucket}/{filename}"
+                else:
+                    public_url = f"/images/{filename}"
+        except Exception as exc:
+            prompt_block = (
+                f"> **[IMAGE GENERATION FAILED]** {spec.get('caption', '')}\n>\n"
+                f"> **Alt:** {spec.get('alt', '')}\n>\n"
+                f"> **Prompt:** {spec.get('prompt', '')}\n>\n"
+                f"> **Error:** {exc}\n"
+            )
+            md = md.replace(placeholder, prompt_block)
+            continue
 
-        img_md = f"![{spec['alt']}](/images/{filename})\n*{spec['caption']}*"
+        img_md = f"![{spec['alt']}]({public_url})\n*{spec['caption']}*"
         md = md.replace(placeholder, img_md)
 
     return {"final": md}
