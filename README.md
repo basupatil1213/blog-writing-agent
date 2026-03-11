@@ -6,6 +6,12 @@ Built with **LangGraph**, **LangChain**, **OpenAI GPT-4o**, **Tavily web search*
 
 ---
 
+## Demo
+
+[Watch the application in action](https://drive.google.com/file/d/1zFE3-aBjkoQeSKaY3MuFfWLfJoa00_mh/view?usp=sharing)
+
+---
+
 ## Features
 
 - **Live pipeline visualization** — animated 9-node diagram tracks every stage of generation in real time via Server-Sent Events
